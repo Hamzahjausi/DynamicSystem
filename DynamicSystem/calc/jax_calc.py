@@ -21,5 +21,3 @@ def fast_calc (n,
     
     return rollout_fn
 
-
-"hi"
