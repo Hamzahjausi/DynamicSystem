@@ -1,21 +1,71 @@
-from linear_system_solver import DynamicSystem , Model
+import dash
+from dash import dcc, html
+from dash.dependencies import Input, Output
+import plotly.graph_objs as go
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
-import jax.random as random 
+from jax import lax, jit, config
 
-system_matrix = jnp.array([[0, 1], [-1.4, -0.3]])
-initial_state = jnp.array([1, 0])
-system = DynamicSystem(system_matrix, initial_state)
+config.update("jax_enable_x64", True)
 
-# Compute the states over time
-time_values = jnp.linspace(0, 10, 200)
-states = system.states_over_time(time_values)
-u1, u2 = states[:, 0], states[:, 1]
+# إعداد Dash
+app = dash.Dash(__name__)
 
+# تخطيط واجهة المستخدم
+app.layout = html.Div([
+    dcc.Graph(id='live-update-graph'),
+    dcc.Interval(
+        id='interval-component',
+        interval=1*1000,  # تحديث كل ثانية
+        n_intervals=0
+    )
+])
 
-K = random.PRNGKey(0)
-noise = random.normal(key=K, shape=(20,))
-theta=jnp.array([0.5,-2,-3,4,6])
+def forward_setup(system_matrix, dt, t_max):
+    n_steps = int(t_max / dt) + 1
+    U_matrix = jnp.eye(system_matrix.shape[0]) + dt * system_matrix
+    return n_steps, U_matrix
 
-data = Model(True, shape=(-1, 1, 20), order=len (theta), key=random.PRNGKey(0), noise=noise, theta = theta)
-print (data.fit(order=4))
+def calc_forward(Un, U_matrix):
+    Un_1 = U_matrix @ Un
+    return Un_1, Un_1
+
+def fast_calc(U_matrix, Un, n_steps):
+    func = jit(lambda Un, _: calc_forward(Un, U_matrix))
+    steps = jnp.arange(n_steps)
+    _, result = lax.scan(func, Un, steps)
+    return result
+
+# إعداد البيانات
+system_matrix = jnp.array([
+    [0, 1],
+    [-1, -0.1]
+], dtype=jnp.float64)
+
+initial_state = jnp.array([1, 1], dtype=jnp.float64)
+dt = 0.01
+t_max = 2 * jnp.pi
+n_steps, U_matrix = forward_setup(system_matrix, dt, t_max)
+
+# دالة لتحديث الرسم البياني بشكل حي
+@app.callback(Output('live-update-graph', 'figure'),
+              Input('interval-component', 'n_intervals'))
+def update_graph_live(n):
+    solution_forward = fast_calc(U_matrix, initial_state, n_steps)
+    
+    heatmap = go.Heatmap(
+        z=solution_forward.T,
+        colorscale='RdBu',
+        zmin=-2,
+        zmax=2
+    )
+
+    layout = go.Layout(
+        title='Live Update of State Trajectory (u0 vs. u1)',
+        xaxis=dict(title='Time'),
+        yaxis=dict(title='Space')
+    )
+
+    return {'data': [heatmap], 'layout': layout}
+
+if __name__ == '__main__':
+    app.run_server(debug=True, host='0.0.0.0', port=8050)

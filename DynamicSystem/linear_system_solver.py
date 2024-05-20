@@ -1,27 +1,68 @@
 import jax.numpy as jnp
-from jax import vmap
 import jax.random as random 
-from jax import config 
+from jax import config, lax ,vmap , jit
 config.update ("jax_enable_x64", True)
+import jax
+from functools import partial
 
 class DynamicSystem:
+
     def __init__(self, system_matrix, initial_state):
-        self.system_matrix = system_matrix
-        self.initial_state = initial_state
+        self.system_matrix = system_matrix.astype(jnp.float64)
+        self.initial_state = initial_state.astype(jnp.float64)
         self._solve_for_initial_conditions()
 
     def _solve_for_initial_conditions(self):
         self.Lambda, self.X = jnp.linalg.eig(self.system_matrix)
         self.X_inv = jnp.linalg.inv(self.X)
         self.c = self.X_inv @ self.initial_state
-
+    @partial (jit , static_argnums = 0)
     def _state_at_time(self, t):
         exp_diag_Lambda = jnp.diag(jnp.exp(self.Lambda * t))
         state_vector = self.X @ (exp_diag_Lambda @ self.c)  
         return state_vector
-
+    @partial (jit , static_argnums = 0)
     def states_over_time(self, time_values):
         return vmap(self._state_at_time, in_axes=0, out_axes=1)(time_values)
+    
+
+
+
+
+
+    def forward_setup (self, dt,t_max):
+        self.n_steps = int(t_max / dt) + 1
+        self.U_matrix= jnp.eye (self.system_matrix.shape[0]) + dt * self.system_matrix
+
+    @partial(jit, static_argnums=0)
+    def _forwar_calc (self , Un , _):
+        Un_1 = self.U_matrix@ Un
+        return Un_1,Un_1
+    
+    @partial(jit, static_argnums=0)
+    def forward_calc (self):
+        un = self.initial_state 
+        steps = jnp.arange (self.n_steps) 
+        _,result= lax.scan (self._forwar_calc , un , steps )
+        return result
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class Model:
@@ -49,3 +90,5 @@ class Model:
         return x, X @ self.theta_hat
     def V (self , i):
         return self.fit (i)
+    
+
