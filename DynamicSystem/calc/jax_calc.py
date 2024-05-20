@@ -1,5 +1,7 @@
-from jax import lax ,jit
+from jax import lax ,jit,vmap
 import jax.numpy as jnp
+import jax
+jax.config.update ("jax_enable_x64", True)
 
 
 def fast_calc (n,
@@ -21,3 +23,18 @@ def fast_calc (n,
     
     return rollout_fn
 
+
+def fast_analytical_solver (X,
+                            Lambda,
+                            c):
+    vectorize = lambda func : vmap (jit(func))
+
+    def process (t):
+        
+        def calc (t):
+            Lambda_t_exp = jnp.diag(jnp.exp(Lambda*t))
+            return X@Lambda_t_exp@c
+
+        return vectorize(calc)(t)
+
+    return process 

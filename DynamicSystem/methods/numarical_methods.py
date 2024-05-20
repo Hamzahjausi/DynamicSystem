@@ -14,6 +14,11 @@ def backward_setup(system_matrix, dt):
                                system_matrix)
     return  U_matrix
 
-
+def analytical_setup (A,
+                       ini) : 
+    Lambda , X = jnp.linalg.eig (A)
+    c= jnp.linalg.inv (X)@ini
+    return X,Lambda,c 
+    
 
 
