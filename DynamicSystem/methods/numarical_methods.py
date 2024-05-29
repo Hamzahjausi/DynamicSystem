@@ -21,5 +21,7 @@ def analytical_setup(A, ini):
     return X, Lambda, c
 
 
-def centreal_setup(system_matrix, dt,un ) :
-    
+def central_setup(system_matrix, dt):
+    U_matrix = 2 * dt * system_matrix
+    I = jnp.eye(system_matrix.shape[0])
+    return U_matrix, I

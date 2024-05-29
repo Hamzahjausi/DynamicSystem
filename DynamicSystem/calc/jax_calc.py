@@ -5,30 +5,31 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 
-def fast_calc(n, include_init=False):
+def fast_calc(n: int, method: str, include_init):
 
-    def rollout_fn(U_matrix, Un):
-        def scan_body(Un, _):
-            Un_1 = jnp.einsum("ij , j ", U_matrix, Un)
-            return Un_1, Un_1
+    def rollout_fn_FB(U_matrix, init_value):
 
-        _, history = lax.scan(jit(scan_body, backend="cpu"), Un, None, length=n)
-        if include_init:
-            return jnp.concatenate([jnp.expand_dims(Un, axis=0), history], axis=0)
-        return history
+        def scan_body(init_value, _):
+            next_step = jnp.einsum("ij ,  j ", U_matrix, init_value)
+            return next_step, next_step
 
+        _, resaut = lax.scan(jit(scan_body, backend="cpu"), init_value, None, length=n)
+        return resaut
+
+    def rollout_fn_C(U_matrix, init_value):
+
+        def scan_body(init_value, _):
+            next_step = jnp.einsum(
+                "ij ,j ->i", U_matrix[1], init_value[0]
+            ) + jnp.einsum("ij,j ->i", U_matrix[0], init_value[1])
+            init_value = jnp.roll(init_value, shift=-1, axis=0).at[-1].set(next_step)
+            return init_value, next_step
+
+        _, resaut = lax.scan(
+            jit(scan_body, backend="cpu"), init_value, None, length=n + 1
+        )
+        return resaut
+
+    method_map = {"F": rollout_fn_FB, "B": rollout_fn_FB, "C": rollout_fn_C}
+    rollout_fn = method_map.get(method.upper())
     return rollout_fn
-
-
-def fast_analytical_solver(X, Lambda, c):
-    vectorize = lambda func: vmap(jit(func))
-
-    def process(t):
-
-        def calc(t):
-            Lambda_t_exp = jnp.diag(jnp.exp(Lambda * t))
-            return jnp.einsum("ij,jh,h", X, Lambda_exp, c)
-
-        return vectorize(calc)(t)
-
-    return process
