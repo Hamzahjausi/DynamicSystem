@@ -2,8 +2,8 @@
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-from calc.jax_calc import forward_setup, backward_setup, analytical_setup, central_setup
-from methods.numarical_methods import fast_calc, fast_analytical_solver
+from methods.numarical_methods import forward_setup, backward_setup, analytical_setup, central_setup
+from calc.jax_calc import fast_calc, fast_analytical_solver
 
 # Enable 64-bit precision in JAX for better numerical accuracy
 jax.config.update("jax_enable_x64", True)
