@@ -12,7 +12,7 @@ jax.config.update("jax_enable_x64", True)
 A = jnp.array([[0, 1], [-1, 0]], dtype=jnp.float64)
 dt = 0.1
 ini = jnp.array([1, 0], dtype=jnp.float64)
-T = 4 * jnp.pi  # Total time for 2 full periods (2 * 2π)
+T = 2 * jnp.pi  # Total time for 2 full periods (2 * 2π)
 steps = int(jnp.round(T / dt))  # Number of steps
 t = jnp.linspace(0, T, steps+1, dtype=jnp.float64)  # Time vector
 
@@ -29,7 +29,7 @@ EU = fast_analytical_solver(*Exact)(t)
 
 # For the central method, we need to compute the initial steps differently
 u_0 = ini
-u_1 = fast_calc(1, method="F", include_init=False)(Uf, ini)
+u_1 = EU[1]
 ini_c = jnp.vstack([u_0, u_1])
 U3 = fast_calc(steps, method="C", include_init=True)(Uc, ini_c)
 
